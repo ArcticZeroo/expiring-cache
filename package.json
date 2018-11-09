@@ -1,6 +1,6 @@
 {
   "name": "expiring-cache",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "description": "An expiring in-memory cache!",
   "main": "ExpiringCache.js",
   "scripts": {
