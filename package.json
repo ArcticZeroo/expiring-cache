@@ -28,6 +28,9 @@
   },
   "homepage": "https://github.com/ArcticZeroo/expiring-cache#readme",
   "dependencies": {
-    "djs-collection": "0.0.5"
+    "@arcticzeroo/collection": "^1.0.2"
+  },
+  "devDependencies": {
+    "@types/node": "^10.12.4"
   }
 }

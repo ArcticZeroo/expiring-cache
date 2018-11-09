@@ -1,7 +1,11 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-const collection_1 = require("@arcticzeroo/collection");
-class ExpiringCache extends collection_1.default {
+import Collection from '@arcticzeroo/collection';
+
+export default class ExpiringCache<TKey, TValue> extends Collection<TKey, TValue> {
+    public readonly expireTime: number;
+    public readonly fetch: (TKey) => Promise<TValue>;
+    private _timer: Collection<TKey, number>;
+    private _clearInterval: NodeJS.Timeout;
+
     /**
      * An expiring cache!
      * <p>
@@ -20,24 +24,28 @@ class ExpiringCache extends collection_1.default {
      * @param {number} [clearTime = 6 Hours] - How long the interval between clearing out invalid cache entries should be.
      * @param {...*} d - Additional params to pass to the Collection constructor.
      */
-    constructor(fetch, expireTime = 1000 * 60 * 60 * 12, clearTime = 1000 * 60 * 60 * 6, ...d) {
+    constructor(fetch: (TKey) => Promise<TValue>, expireTime: number = 1000 * 60 * 60 * 12, clearTime: number = 1000 * 60 * 60 * 6, ...d: any[]) {
         super(...d);
+
         /**
          * The amount of time it takes for a cache entry to expire.
          * @type {number}
          */
         this.expireTime = expireTime;
+
         /**
          * A function to get a new entry when no valid entry for the given key is present.
          * @type {Function}
          */
         this.fetch = fetch;
+
         /**
          * A timer to track the insert time of each item.
          * @type {Collection}
          * @private
          */
-        this._timer = new collection_1.default();
+        this._timer = new Collection();
+
         this._clearInterval = setInterval(() => {
             for (const key of this.keys()) {
                 if (!this.hasValid(key)) {
@@ -47,6 +55,7 @@ class ExpiringCache extends collection_1.default {
             }
         }, clearTime);
     }
+
     /**
      * Get an entry, whether or not one currently exists in cache.
      * <p>
@@ -55,19 +64,22 @@ class ExpiringCache extends collection_1.default {
      * @param {*} key - The key to get.
      * @return {*}
      */
-    async getEntry(key) {
+    async getEntry(key: TKey): Promise<TValue> {
         if (this.hasValid(key)) {
             return super.get(key);
         }
+
         try {
             const val = await this.fetch(key);
+
             this.set(key, val);
+
             return val;
-        }
-        catch (e) {
+        } catch (e) {
             throw e;
         }
     }
+
     /**
      * Find out whether this collection has a valid entry for a
      * given key. An entry is valid if it exists and the amount
@@ -80,12 +92,14 @@ class ExpiringCache extends collection_1.default {
      * @param {*} key - The key to search for.
      * @return {boolean}
      */
-    hasValid(key) {
+    hasValid(key: TKey): boolean {
         if (!this._timer.has(key)) {
             return false;
         }
+
         return (Date.now() - this._timer.get(key) <= this.expireTime);
     }
+
     /**
      * Set a key to a particular value. This also updates the
      * time that this key was added to the collection, so don't
@@ -96,10 +110,9 @@ class ExpiringCache extends collection_1.default {
      * @param {*} val - A value to set it to.
      * @return {*}
      */
-    set(key, val) {
+    set(key: TKey, val: TValue): this {
         this._timer.set(key, Date.now());
+
         return super.set(key, val);
     }
 }
-exports.default = ExpiringCache;
-//# sourceMappingURL=ExpiringCache.js.map
