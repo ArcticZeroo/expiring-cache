@@ -2,7 +2,7 @@
   "name": "expiring-cache",
   "version": "1.0.0",
   "description": "An expiring in-memory cache!",
-  "main": "ExpiringCache.js",
+  "main": "index.js",
   "scripts": {
     "test": "mocha"
   },
@@ -28,9 +28,11 @@
   },
   "homepage": "https://github.com/ArcticZeroo/expiring-cache#readme",
   "dependencies": {
-    "@arcticzeroo/collection": "^1.0.2"
+    "@arcticzeroo/collection": "^1.0.2",
+    "@arcticzeroo/duration": "^1.1.0"
   },
   "devDependencies": {
-    "@types/node": "^10.12.4"
+    "@types/node": "^10.12.4",
+    "typescript": "^3.2.2"
   }
 }

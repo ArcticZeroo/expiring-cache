@@ -1,7 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const collection_1 = require("@arcticzeroo/collection");
-class ExpiringCache extends collection_1.default {
+const duration_1 = require("@arcticzeroo/duration");
+class ExpiringCache {
     /**
      * An expiring cache!
      * <p>
@@ -18,15 +19,13 @@ class ExpiringCache extends collection_1.default {
      * @param {function} fetch - A function to use to grab data when no valid entry for the given key is present. It should take the key as a parameter.
      * @param {number} [expireTime = 12 Hours] - The amount of time it takes for a cache entry to expire. Defaults to 12 hours.
      * @param {number} [clearTime = 6 Hours] - How long the interval between clearing out invalid cache entries should be.
-     * @param {...*} d - Additional params to pass to the Collection constructor.
      */
-    constructor(fetch, expireTime = 1000 * 60 * 60 * 12, clearTime = 1000 * 60 * 60 * 6, ...d) {
-        super(...d);
+    constructor(fetch, expireTime = new duration_1.default({ hours: 12 }), clearTime = new duration_1.default({ hours: 6 })) {
         /**
          * The amount of time it takes for a cache entry to expire.
          * @type {number}
          */
-        this.expireTime = expireTime;
+        this.expireTime = duration_1.default.fromDurationOrMilliseconds(expireTime);
         /**
          * A function to get a new entry when no valid entry for the given key is present.
          * @type {Function}
@@ -38,14 +37,15 @@ class ExpiringCache extends collection_1.default {
          * @private
          */
         this._timer = new collection_1.default();
+        this._data = new collection_1.default();
         this._clearInterval = setInterval(() => {
-            for (const key of this.keys()) {
-                if (!this.hasValid(key)) {
-                    this.delete(key);
+            for (const key of this._data.keys()) {
+                if (!this.has(key)) {
+                    this._data.delete(key);
                     this._timer.delete(key);
                 }
             }
-        }, clearTime);
+        }, duration_1.default.fromDurationOrMilliseconds(clearTime).inMilliseconds);
     }
     /**
      * Get an entry, whether or not one currently exists in cache.
@@ -56,8 +56,16 @@ class ExpiringCache extends collection_1.default {
      * @return {*}
      */
     async getEntry(key) {
-        if (this.hasValid(key)) {
-            return super.get(key);
+        return this.get(key);
+    }
+    /**
+     * Get an entry, whether or not it exists in the cache. If it does
+     * not exist in the cache, fetch will be called.
+     * @param key - The key to get
+     */
+    async get(key) {
+        if (this.has(key)) {
+            return this._data.get(key);
         }
         try {
             const val = await this.fetch(key);
@@ -67,6 +75,9 @@ class ExpiringCache extends collection_1.default {
         catch (e) {
             throw e;
         }
+    }
+    hasValid(key) {
+        return this.has(key);
     }
     /**
      * Find out whether this collection has a valid entry for a
@@ -80,11 +91,13 @@ class ExpiringCache extends collection_1.default {
      * @param {*} key - The key to search for.
      * @return {boolean}
      */
-    hasValid(key) {
+    has(key) {
         if (!this._timer.has(key)) {
             return false;
         }
-        return (Date.now() - this._timer.get(key) <= this.expireTime);
+        const value = this._data.get(key);
+        const time = this._timer.get(key);
+        return value != null && time != null && (Date.now() - time <= this.expireTime.inMilliseconds);
     }
     /**
      * Set a key to a particular value. This also updates the
@@ -98,7 +111,8 @@ class ExpiringCache extends collection_1.default {
      */
     set(key, val) {
         this._timer.set(key, Date.now());
-        return super.set(key, val);
+        this._data.set(key, val);
+        return this;
     }
 }
 exports.default = ExpiringCache;

@@ -34,6 +34,12 @@ const expiringCache: ExpiringCache<string, number> = new ExpiringCache<string, n
 async function main() {
     // As expected, if fetch's promise fails then this will also throw
     // Otherwise value is now a number.
-    const value = await expiringCache.getEntry('duck');
+    const value = await expiringCache.get('duck');
 }
 ```
+
+## Upgrading from v1 to v2
+
+* Stop using `Collection` methods. They are not supported. If you reallllly need them, use the private `_data` property
+* (Optional, but recommended) switch to `get` and `has` from `getValue` and `hasValid`. They are aliases and identical.
+* If you use the `expireTime` property, it is now a `Duration`. Use `expireTime.inMilliseconds` instead.

@@ -1,9 +1,13 @@
 import Collection from '@arcticzeroo/collection';
+import Duration, { DurationOrMilliseconds } from '@arcticzeroo/duration';
 
-export default class ExpiringCache<TKey, TValue> extends Collection<TKey, TValue> {
-    public readonly expireTime: number;
-    public readonly fetch: (TKey) => Promise<TValue>;
-    private _timer: Collection<TKey, number>;
+type FetchAsync<K, V> = (key: K) => Promise<V>;
+
+export default class ExpiringCache<K, V> {
+    public readonly expireTime: Duration;
+    public readonly fetch: FetchAsync<K, V>;
+    private readonly _data: Collection<K, V>;
+    private _timer: Collection<K, number>;
     private _clearInterval: NodeJS.Timeout;
 
     /**
@@ -22,16 +26,13 @@ export default class ExpiringCache<TKey, TValue> extends Collection<TKey, TValue
      * @param {function} fetch - A function to use to grab data when no valid entry for the given key is present. It should take the key as a parameter.
      * @param {number} [expireTime = 12 Hours] - The amount of time it takes for a cache entry to expire. Defaults to 12 hours.
      * @param {number} [clearTime = 6 Hours] - How long the interval between clearing out invalid cache entries should be.
-     * @param {...*} d - Additional params to pass to the Collection constructor.
      */
-    constructor(fetch: (TKey) => Promise<TValue>, expireTime: number = 1000 * 60 * 60 * 12, clearTime: number = 1000 * 60 * 60 * 6, ...d: any[]) {
-        super(...d);
-
+    constructor(fetch: FetchAsync<K, V>, expireTime: DurationOrMilliseconds = new Duration({ hours: 12 }), clearTime: DurationOrMilliseconds = new Duration({ hours: 6 })) {
         /**
          * The amount of time it takes for a cache entry to expire.
          * @type {number}
          */
-        this.expireTime = expireTime;
+        this.expireTime = Duration.fromDurationOrMilliseconds(expireTime);
 
         /**
          * A function to get a new entry when no valid entry for the given key is present.
@@ -46,14 +47,16 @@ export default class ExpiringCache<TKey, TValue> extends Collection<TKey, TValue
          */
         this._timer = new Collection();
 
+        this._data = new Collection<K, V>();
+
         this._clearInterval = setInterval(() => {
-            for (const key of this.keys()) {
-                if (!this.hasValid(key)) {
-                    this.delete(key);
+            for (const key of this._data.keys()) {
+                if (!this.has(key)) {
+                    this._data.delete(key);
                     this._timer.delete(key);
                 }
             }
-        }, clearTime);
+        }, Duration.fromDurationOrMilliseconds(clearTime).inMilliseconds);
     }
 
     /**
@@ -64,9 +67,18 @@ export default class ExpiringCache<TKey, TValue> extends Collection<TKey, TValue
      * @param {*} key - The key to get.
      * @return {*}
      */
-    async getEntry(key: TKey): Promise<TValue> {
-        if (this.hasValid(key)) {
-            return super.get(key);
+    async getEntry(key: K): Promise<V | undefined> {
+        return this.get(key);
+    }
+
+    /**
+     * Get an entry, whether or not it exists in the cache. If it does
+     * not exist in the cache, fetch will be called.
+     * @param key - The key to get
+     */
+    async get(key: K): Promise<V | undefined> {
+        if (this.has(key)) {
+            return this._data.get(key);
         }
 
         try {
@@ -78,6 +90,10 @@ export default class ExpiringCache<TKey, TValue> extends Collection<TKey, TValue
         } catch (e) {
             throw e;
         }
+    }
+
+    hasValid(key: K): boolean {
+        return this.has(key);
     }
 
     /**
@@ -92,12 +108,15 @@ export default class ExpiringCache<TKey, TValue> extends Collection<TKey, TValue
      * @param {*} key - The key to search for.
      * @return {boolean}
      */
-    hasValid(key: TKey): boolean {
+    has(key: K): boolean {
         if (!this._timer.has(key)) {
             return false;
         }
 
-        return (Date.now() - this._timer.get(key) <= this.expireTime);
+        const value = this._data.get(key);
+        const time = this._timer.get(key);
+
+        return value != null && time != null && (Date.now() - time <= this.expireTime.inMilliseconds);
     }
 
     /**
@@ -110,9 +129,10 @@ export default class ExpiringCache<TKey, TValue> extends Collection<TKey, TValue
      * @param {*} val - A value to set it to.
      * @return {*}
      */
-    set(key: TKey, val: TValue): this {
+    set(key: K, val: V): this {
         this._timer.set(key, Date.now());
 
-        return super.set(key, val);
+        this._data.set(key, val);
+        return this;
     }
 }
